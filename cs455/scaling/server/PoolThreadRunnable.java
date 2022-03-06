@@ -43,7 +43,6 @@ public class PoolThreadRunnable implements Runnable {
     }
 
     public void setTaskResult(String hashResult) {
-        System.out.println(hashResult);
         this.manager.remove(hashResult);
     }
 }

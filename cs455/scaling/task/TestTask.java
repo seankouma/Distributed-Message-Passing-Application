@@ -1,27 +1,28 @@
 package cs455.scaling.task;
 
+import java.math.BigInteger;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+
+import cs455.scaling.server.PoolThreadRunnable;
+import cs455.scaling.util.Utility;
 
 public class TestTask implements Runnable {
     
     byte[] data;
     PoolThreadRunnable caller;
 
-    TestTask(byte[] testBytes) {
+    public TestTask(byte[] testBytes) {
         this.data = testBytes;
-    }
-
-    private String SHA1FromBytes(byte[] data) {
-        MessageDigest digest = MessageDigest.getInstance("SHA1");
-        byte[] hash = digest.digest(data);
-        BigInteger hashInt = new BigInteger(1, hash);
-        return hashInt.toString(16);
     }
 
     public void setCaller(PoolThreadRunnable caller) {
         this.caller = caller;
     }
 
-    run() {
-        this.caller.setTaskResult(this.SHA1FromBytes(data));
+    @Override
+    public void run() {
+        String hash = Utility.SHA1FromBytes(data);
+        this.caller.setTaskResult(hash);
     }
 }
