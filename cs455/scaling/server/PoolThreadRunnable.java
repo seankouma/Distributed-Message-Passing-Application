@@ -4,7 +4,7 @@ package cs455.scaling.server;
 
 import java.util.concurrent.BlockingQueue;
 
-import cs455.scaling.task.TestTask;
+import cs455.scaling.task.HashTask;
 
 public class PoolThreadRunnable implements Runnable {
 
@@ -22,7 +22,7 @@ public class PoolThreadRunnable implements Runnable {
         this.thread = Thread.currentThread();
         while(!isStopped()){
             try{
-                TestTask runnable = (TestTask) taskQueue.take();
+                HashTask runnable = (HashTask) taskQueue.take();
                 runnable.setCaller(this);
                 runnable.run();
             } catch(Exception e){

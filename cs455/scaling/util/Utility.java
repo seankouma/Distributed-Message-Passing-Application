@@ -5,8 +5,9 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
 public class Utility {
+    private static MessageDigest digest;
+
     public static String SHA1FromBytes(byte[] data) {
-        MessageDigest digest;
         try {
             digest = MessageDigest.getInstance("SHA1");
             byte[] hash = digest.digest(data);

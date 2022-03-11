@@ -17,14 +17,14 @@ import java.util.Iterator;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 
-import cs455.scaling.task.TestTask;
+import cs455.scaling.task.HashTask;
 import cs455.scaling.util.Utility;
 
 public class Server {
     private Selector selector;
     private ServerSocketChannel serverSocket;
     private ThreadPool pool;
-    private ConcurrentHashMap hashesToArrays; // This will get moved to only live in the ThreadPool class. Only here for testing
+    private ConcurrentHashMap<String,byte[]> hashesToArrays; // This will get moved to only live in the ThreadPool class. Only here for testing
     
     Server() {
         this.hashesToArrays = new ConcurrentHashMap<String, byte[]>();
@@ -58,9 +58,8 @@ public class Server {
 
         Server server = new Server();
         server.setupServerSocketChannel("localhost", portNum);
+        server.setupThreadPool(5);
         server.listen();
-        
-        System.exit(0);
     }
 
     private void listen() {
@@ -86,17 +85,15 @@ public class Server {
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
+        } catch (Exception e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
         }
     }
 
     private void acceptConnection(SelectionKey key) throws IOException {
         System.out.println("It works!");
-        if (key.attachment() == null) {
-            key.attach(42);
             this.register(selector, serverSocket);
-        } else {
-            // log.debug("\tAlready registered");
-        }
     }
 
     private void register(Selector selector, ServerSocketChannel serverSocket) throws IOException {
@@ -105,13 +102,16 @@ public class Server {
         client.register(selector, SelectionKey.OP_READ);
     }
 
-    private void readFromConnection(SelectionKey key) throws IOException {
-        System.out.println("Readable!");
+    private void readFromConnection(SelectionKey key) throws Exception {
         ByteBuffer buffer = ByteBuffer.allocate(8192);
         SocketChannel client = (SocketChannel) key.channel();
-        client.read(buffer);
-        System.out.println("Hash: " + Utility.SHA1FromBytes(buffer.array()));
-        System.exit(0);
+        int bytesRead = 0;
+        while ( buffer.hasRemaining() && bytesRead != -1 ) {
+            bytesRead = client.read( buffer );
+        }
+        HashTask task = new HashTask(buffer.array());
+        this.pool.execute(task);
+        // key.cancel();
         if (key.attachment() == null) {
             // ReadAndRespond readAndRespond = new ReadAndRespond(key);
             // threadPoolManager.addTask(readAndRespond);
