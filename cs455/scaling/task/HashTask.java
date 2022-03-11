@@ -7,12 +7,12 @@ import java.security.NoSuchAlgorithmException;
 import cs455.scaling.server.PoolThreadRunnable;
 import cs455.scaling.util.Utility;
 
-public class TestTask implements Runnable {
+public class HashTask implements Runnable {
     
     byte[] data;
     PoolThreadRunnable caller;
 
-    public TestTask(byte[] testBytes) {
+    public HashTask(byte[] testBytes) {
         this.data = testBytes;
     }
 
@@ -23,6 +23,7 @@ public class TestTask implements Runnable {
     @Override
     public void run() {
         String hash = Utility.SHA1FromBytes(data);
+        System.out.println("Hash: " + hash);
         this.caller.setTaskResult(hash);
     }
 }
