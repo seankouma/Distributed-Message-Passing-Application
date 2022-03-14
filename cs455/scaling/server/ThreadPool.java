@@ -1,44 +1,40 @@
 package cs455.scaling.server;
 // Some code taken from http://tutorials.jenkov.com/java-concurrency/thread-pools.html
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import cs455.scaling.task.Task;
+
 public class ThreadPool {
 
-    private BlockingQueue taskQueue = null;
+    private LinkedBlockingQueue<Task> taskQueue = null;
     private List<PoolThreadRunnable> runnables = new ArrayList<>();
-    private boolean isStopped = false;
+    private Deque<PoolThreadRunnable> available = new ArrayDeque<PoolThreadRunnable>();
 
-    ConcurrentHashMap hashesToArrays;
-
-    public ThreadPool(int noOfThreads, ConcurrentHashMap hashesToArrays){
-        taskQueue = new LinkedBlockingQueue();
-        this.hashesToArrays = hashesToArrays;
+    public ThreadPool(int noOfThreads){
+        taskQueue = new LinkedBlockingQueue<Task>();
 
         for(int i=0; i<noOfThreads; i++){
-            runnables.add(new PoolThreadRunnable(taskQueue, this));
+            PoolThreadRunnable ptr = new PoolThreadRunnable(taskQueue, this);
+            runnables.add(ptr);
+            available.add(ptr);
         }
-        for(PoolThreadRunnable runnable : runnables){
+        for(PoolThreadRunnable runnable : runnables) {
             new Thread(runnable).start();
         }
     }
 
-    public synchronized void  execute(Runnable task) throws Exception {
-        if(this.isStopped) throw
-                new IllegalStateException("ThreadPool is stopped");
-
-        this.taskQueue.offer(task);
-    }
-
-    public synchronized void stop(){
-        this.isStopped = true;
-        for(PoolThreadRunnable runnable : runnables){
-            runnable.doStop();
-        }
+    public synchronized void execute(Task task) {
+        PoolThreadRunnable current =  available.pollLast();
+        while (current == null) current = available.pollLast();
+        current.addTask(task);
+        available.addFirst(current);
     }
 
     public synchronized void waitUntilAllTasksFinished() {
@@ -49,10 +45,6 @@ public class ThreadPool {
                 e.printStackTrace();
             }
         }
-    }
-
-    public void remove(String hash) {
-        this.hashesToArrays.remove(hash);
     }
 
 }

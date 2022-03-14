@@ -3,46 +3,47 @@ package cs455.scaling.server;
 // Some code taken from http://tutorials.jenkov.com/java-concurrency/thread-pools.html
 
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import cs455.scaling.task.HashTask;
+import cs455.scaling.task.Task;
 
 public class PoolThreadRunnable implements Runnable {
 
-    private Thread        thread    = null;
-    private BlockingQueue taskQueue = null;
+    private BlockingQueue<Task> taskQueue = null;
     private boolean       isStopped = false;
+    public boolean available = true;
     ThreadPool manager;
 
-    public PoolThreadRunnable(BlockingQueue queue, ThreadPool manager){
-        taskQueue = queue;
+    public PoolThreadRunnable(BlockingQueue<Task> queue, ThreadPool manager) {
+        taskQueue = new LinkedBlockingQueue<Task>();
         this.manager = manager;
     }
 
-    public void run(){
-        this.thread = Thread.currentThread();
-        while(!isStopped()){
-            try{
-                HashTask runnable = (HashTask) taskQueue.take();
-                runnable.setCaller(this);
-                runnable.run();
-            } catch(Exception e){
-                //log or otherwise report exception,
-                //but keep pool thread alive.
+    @Override
+    public void run() {
+        while (true) {
+            if (taskQueue.size() > 0) {
+                try {
+                    Task task = taskQueue.take();
+                    task.executeTask();
+                    this.available = true;
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
             }
         }
     }
-
-    public synchronized void doStop(){
-        isStopped = true;
-        //break pool thread out of dequeue() call.
-        this.thread.interrupt();
+    
+    public void addTask(Task task) {
+        this.taskQueue.add(task);
     }
 
     public synchronized boolean isStopped(){
         return isStopped;
     }
 
-    public void setTaskResult(String hashResult) {
-        this.manager.remove(hashResult);
+    public void makeUnavailable() {
+        this.available = false;
     }
 }

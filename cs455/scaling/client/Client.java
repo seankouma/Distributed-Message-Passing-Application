@@ -5,39 +5,54 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.Random;
-import cs455.scaling.server.Server;
-import cs455.scaling.util.Utility;
+import java.util.Timer;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class Client {
-    public static void main(String[] args ) {
-        try {
-            SocketChannel socketChannel = SocketChannel.open(new InetSocketAddress( "localhost", 5000 ));
-            socketChannel.configureBlocking( false );
-            Random r = new Random();
 
-            for (int i = 0; i < 100; i++) {
-                byte[] b = new byte[8192]; // Create 8KB byte array
-                r.nextBytes(b); // Fill with random values
-                String hash = Utility.SHA1FromBytes(b);
-                System.out.println("Hash: " + hash);
-                ByteBuffer buffer = ByteBuffer.wrap(b);
-                String response = null;
-                try {
-                    socketChannel.write(buffer);
-                    buffer.clear();
-                    socketChannel.read(buffer);
-                    response = new String(buffer.array()).trim();
-                    // System.out.println("response=" + response);
-                    buffer.clear();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+    private ConcurrentHashMap<String,byte[]> hashesToArrays = new ConcurrentHashMap<String, byte[]>();
+    
+    public void sendPackets(SocketChannel channel, long period) {
+        Random r = new Random();
+
+        Timer timer = new Timer();
+
+        SendTask task = new SendTask(channel, hashesToArrays);
+
+        timer.scheduleAtFixedRate(task, 0L, period);
+
+        ByteBuffer buffer = ByteBuffer.allocate(40);
+        int bytesRead = 0;
+        while (true) {
+            try {
+                channel.read(buffer);
+            } catch (IOException e) {
+                e.printStackTrace();
             }
-            while(true); /* This keeps the SocketChannel open and prevents a bug where
-                          the server node keeps reading empty byte arrays from a closed SocketChanel.
-                          Once we put this code in a while loop rather than a for-loop, it will fix this.*/
+            String hash = new String(buffer.array()).trim();
+            this.hashesToArrays.remove(hash);
+            buffer.rewind();
+        }
+    }
+
+    public SocketChannel setupServerConnection(String hostname, int port) {
+        try {
+            SocketChannel socketChannel = SocketChannel.open(new InetSocketAddress( hostname, port ));
+            socketChannel.configureBlocking( false );
+            return socketChannel;
         } catch (IOException e) {
             e.printStackTrace();
         }
+        return null;
+    }
+
+    public static void main(String[] args ) {
+        String hostname = args[0];
+        int port = Integer.parseInt(args[1]);
+        int rate = Integer.parseInt(args[2]);
+
+        Client client = new Client();
+        SocketChannel serverChannel = client.setupServerConnection(hostname, port);
+        client.sendPackets(serverChannel, 1000L / rate);
     }
 }

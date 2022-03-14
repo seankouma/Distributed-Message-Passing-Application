@@ -1,29 +1,35 @@
 package cs455.scaling.task;
 
+import java.io.IOException;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.concurrent.LinkedBlockingDeque;
 
+import cs455.scaling.server.BatchUnit;
 import cs455.scaling.server.PoolThreadRunnable;
 import cs455.scaling.util.Utility;
 
-public class HashTask implements Runnable {
+public class HashTask implements Task {
     
-    byte[] data;
+    LinkedBlockingDeque<BatchUnit> batchQueue;
     PoolThreadRunnable caller;
 
-    public HashTask(byte[] testBytes) {
-        this.data = testBytes;
-    }
-
-    public void setCaller(PoolThreadRunnable caller) {
-        this.caller = caller;
+    public HashTask(LinkedBlockingDeque<BatchUnit> batchQueue) {
+        this.batchQueue = batchQueue;
     }
 
     @Override
-    public void run() {
-        String hash = Utility.SHA1FromBytes(data);
-        System.out.println("Hash: " + hash);
-        this.caller.setTaskResult(hash);
+    public void executeTask() {
+        for (BatchUnit unit : batchQueue) {
+            String hash = Utility.SHA1FromBytes(unit.data);
+            System.out.println("Hash: " + hash);
+            try {
+                unit.channel.write(ByteBuffer.wrap(hash.getBytes()));
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
     }
 }

@@ -16,19 +16,17 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Iterator;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.LinkedBlockingDeque;
 
+import cs455.scaling.task.AcceptTask;
 import cs455.scaling.task.HashTask;
+import cs455.scaling.task.ReadTask;
 import cs455.scaling.util.Utility;
 
 public class Server {
     private Selector selector;
     private ServerSocketChannel serverSocket;
     private ThreadPool pool;
-    private ConcurrentHashMap<String,byte[]> hashesToArrays; // This will get moved to only live in the ThreadPool class. Only here for testing
-    
-    Server() {
-        this.hashesToArrays = new ConcurrentHashMap<String, byte[]>();
-    }
 
     private void setupServerSocketChannel(String host, int port) {
         try {
@@ -38,16 +36,14 @@ public class Server {
             serverSocket.configureBlocking( false );
             serverSocket.register( selector, SelectionKey.OP_ACCEPT );
         } catch (ClosedChannelException e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
         } catch (IOException e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
         }
     }
 
     private void setupThreadPool(int threadPoolSize) {
-        this.pool = new ThreadPool(threadPoolSize, hashesToArrays);
+        this.pool = new ThreadPool(threadPoolSize);
     }
 
     public static void main(String[] args) {
@@ -58,12 +54,13 @@ public class Server {
 
         Server server = new Server();
         server.setupServerSocketChannel("localhost", portNum);
-        server.setupThreadPool(5);
-        server.listen();
+        server.setupThreadPool(threadPoolSize);
+        server.listen(batchSize, batchTime);
     }
 
-    private void listen() {
+    private void listen(int batchSize, int batchTime) {
         try {
+            LinkedBlockingDeque<BatchUnit> batchQueue = new LinkedBlockingDeque<BatchUnit>();
             while ( true ) {
                 selector.select();
                 Iterator<SelectionKey> iterator = selector.selectedKeys().iterator();
@@ -71,11 +68,17 @@ public class Server {
                 while (iterator.hasNext()) {
                     SelectionKey key = iterator.next();
                     if (key.isAcceptable()) {
-                        this.acceptConnection(key);
+                        System.out.println("Acceptable");
+                        this.addAcceptTask(this.selector, this.serverSocket);
                     }
-
+                    if (batchQueue.size() >= batchSize) {
+                        System.out.println("Batch");
+                        this.pool.execute(new HashTask(batchQueue));
+                        batchQueue = new LinkedBlockingDeque<BatchUnit>();
+                    }
                     if (key.isReadable()) {
-                        this.readFromConnection(key);
+                        System.out.println("Readable. Size: " + batchQueue.size());
+                        this.addReadTask(key, batchQueue);
                     }
                     iterator.remove();
                 }
@@ -86,63 +89,17 @@ public class Server {
         } catch (IOException e) {
             e.printStackTrace();
         } catch (Exception e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
         }
     }
 
-    private void acceptConnection(SelectionKey key) throws IOException {
-        System.out.println("It works!");
-            this.register(selector, serverSocket);
-    }
-
-    private void register(Selector selector, ServerSocketChannel serverSocket) throws IOException {
-        SocketChannel client = serverSocket.accept();
-        client.configureBlocking(false);
-        client.register(selector, SelectionKey.OP_READ);
-    }
-
-    private void readFromConnection(SelectionKey key) throws Exception {
-        ByteBuffer buffer = ByteBuffer.allocate(8192);
-        SocketChannel client = (SocketChannel) key.channel();
-        int bytesRead = 0;
-        while ( buffer.hasRemaining() && bytesRead != -1 ) {
-            bytesRead = client.read( buffer );
-        }
-        HashTask task = new HashTask(buffer.array());
+    private void addAcceptTask(Selector selector, ServerSocketChannel serverSocket) {
+        AcceptTask task = new AcceptTask(selector, serverSocket);
         this.pool.execute(task);
-        // key.cancel();
-        if (key.attachment() == null) {
-            // ReadAndRespond readAndRespond = new ReadAndRespond(key);
-            // threadPoolManager.addTask(readAndRespond);
-        } else {
-            // log.debug("\tAlreadyReadAndResponded");
-        }
+    }
+
+    private void addReadTask(SelectionKey key, LinkedBlockingDeque<BatchUnit> batchQueue) throws Exception {
+        ReadTask task = new ReadTask(key, batchQueue);
+        this.pool.execute(task);
     }
 }
-
-// TEST CODE FOR THREAD POOL. Borrow from this code when adding thread pool functionality back in.
-// server.setupThreadPool(threadPoolSize);
-
-        //Test Code
-        // Random r = new Random();
-        // for (int i = 0; i < 10; ++i) {
-        //     byte[] b = new byte[8192]; // Create 8KB byte array
-        //     r.nextBytes(b); // Fill with random values
-        //     String hash = Utility.SHA1FromBytes(b);
-        //     server.hashesToArrays.put(hash, b);
-        //     TestTask task = new TestTask(b);
-        //     try {
-        //         server.pool.execute(task);
-        //     } catch (Exception e) {
-        //         // TODO Auto-generated catch block
-        //         e.printStackTrace();
-        //     }
-        // }
-        // try {
-        //     Thread.sleep(1000);
-        //     System.out.println("Size: " + server.hashesToArrays.size()); // Should be 0 if everything went well
-        // } catch (InterruptedException e) {
-        //     // TODO Auto-generated catch block
-        //     e.printStackTrace();
-        // }
