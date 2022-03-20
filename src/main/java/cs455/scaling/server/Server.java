@@ -17,24 +17,31 @@ import java.util.Iterator;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.LinkedBlockingQueue;
 
+import cs455.scaling.task.Task;
 import cs455.scaling.task.AcceptTask;
 import cs455.scaling.task.HashTask;
 import cs455.scaling.task.ReadTask;
 import cs455.scaling.util.Utility;
 
 public class Server {
+    private LinkedBlockingQueue<Task> taskQueue;
     private Selector selector;
     private ServerSocketChannel serverSocket;
     private ThreadPool pool;
 
-    private void setupServerSocketChannel(String host, int port) {
+	public Server(){
+		taskQueue = new LinkedBlockingQueue<Task>();
+	}
+
+    private void setupServerSocketChannel(int port) {
         try {
             selector = Selector.open(); // created once
             serverSocket = ServerSocketChannel.open();
-            serverSocket.socket().bind( new InetSocketAddress( host, port ) );
-            serverSocket.configureBlocking( false );
-            serverSocket.register( selector, SelectionKey.OP_ACCEPT );
+            serverSocket.socket().bind(new InetSocketAddress(port));
+            serverSocket.configureBlocking(false);
+            serverSocket.register(selector, SelectionKey.OP_ACCEPT);
         } catch (ClosedChannelException e) {
             e.printStackTrace();
         } catch (IOException e) {
@@ -47,13 +54,13 @@ public class Server {
     }
 
     public static void main(String[] args) {
-        int portNum = Integer.parseInt(args[0]);
-        int threadPoolSize = Integer.parseInt(args[1]);
-        int batchSize = Integer.parseInt(args[2]);
-        int batchTime = Integer.parseInt(args[3]);
+        int portNum = Integer.parseInt(args[1]);
+        int threadPoolSize = Integer.parseInt(args[2]);
+        int batchSize = Integer.parseInt(args[3]);
+        int batchTime = Integer.parseInt(args[4]);
 
         Server server = new Server();
-        server.setupServerSocketChannel("localhost", portNum);
+        server.setupServerSocketChannel(portNum);
         server.setupThreadPool(threadPoolSize);
         server.listen(batchSize, batchTime);
     }
@@ -62,26 +69,29 @@ public class Server {
         try {
             LinkedBlockingDeque<BatchUnit> batchQueue = new LinkedBlockingDeque<BatchUnit>();
             while ( true ) {
-                selector.select();
-                Iterator<SelectionKey> iterator = selector.selectedKeys().iterator();
+				synchronized(selector){
+                	selector.select();
+                	Iterator<SelectionKey> iterator = selector.selectedKeys().iterator();
                 
-                while (iterator.hasNext()) {
-                    SelectionKey key = iterator.next();
-                    if (key.isAcceptable()) {
-                        System.out.println("Acceptable");
-                        this.addAcceptTask(this.selector, this.serverSocket);
-                    }
-                    if (batchQueue.size() >= batchSize) {
-                        System.out.println("Batch");
-                        this.pool.execute(new HashTask(batchQueue));
-                        batchQueue = new LinkedBlockingDeque<BatchUnit>();
-                    }
-                    if (key.isReadable()) {
-                        System.out.println("Readable. Size: " + batchQueue.size());
-                        this.addReadTask(key, batchQueue);
-                    }
-                    iterator.remove();
-                }
+                	while (iterator.hasNext()) {
+                    	SelectionKey key = iterator.next();
+                    	if (key.isAcceptable()) {
+                        	System.out.println("Acceptable");
+                        	this.addAcceptTask(this.selector, this.serverSocket);
+                    	}
+                    	if (batchQueue.size() >= batchSize) {
+                        	System.out.println("Batch");
+                        	taskQueue.add(new HashTask(batchQueue));
+                        	batchQueue.clear(); 
+                    	}
+                    	if (key.isReadable()) {
+                        	System.out.println("Readable. Size: " + batchQueue.size());
+                        	this.addReadTask(key, batchQueue);
+                    	}
+                    	iterator.remove();
+                	}
+				}
+				assignTasks();
             }
 
         } catch (UnknownHostException e) {
@@ -93,13 +103,21 @@ public class Server {
         }
     }
 
+	private void assignTasks(){
+		synchronized(pool){
+			while(!taskQueue.isEmpty() && pool.hasWorker()){
+				pool.execute(taskQueue.poll());
+			}
+		}
+	}
+		
     private void addAcceptTask(Selector selector, ServerSocketChannel serverSocket) {
         AcceptTask task = new AcceptTask(selector, serverSocket);
-        this.pool.execute(task);
+		taskQueue.add(task);	
     }
 
     private void addReadTask(SelectionKey key, LinkedBlockingDeque<BatchUnit> batchQueue) throws Exception {
         ReadTask task = new ReadTask(key, batchQueue);
-        this.pool.execute(task);
+		taskQueue.add(task);	
     }
 }

@@ -25,7 +25,9 @@ public class ReadTask implements Task {
             while ( buffer.hasRemaining() && bytesRead != -1 ) {
                 bytesRead = client.read( buffer );
             }
-            batchQueue.offer(new BatchUnit(buffer.array(), client));
+			synchronized(batchQueue){
+            	batchQueue.offer(new BatchUnit(buffer.array(), client));
+			}
         } catch (Exception e) {
             e.printStackTrace();
         }

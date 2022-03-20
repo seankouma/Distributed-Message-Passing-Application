@@ -17,7 +17,7 @@ public class HashTask implements Task {
     PoolThreadRunnable caller;
 
     public HashTask(LinkedBlockingDeque<BatchUnit> batchQueue) {
-        this.batchQueue = batchQueue;
+        this.batchQueue = new LinkedBlockingDeque(batchQueue);
     }
 
     @Override

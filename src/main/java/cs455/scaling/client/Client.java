@@ -37,6 +37,7 @@ public class Client {
 
     public SocketChannel setupServerConnection(String hostname, int port) {
         try {
+			System.out.println(SocketChannel.open(new InetSocketAddress( hostname, port )));
             SocketChannel socketChannel = SocketChannel.open(new InetSocketAddress( hostname, port ));
             socketChannel.configureBlocking( false );
             return socketChannel;
@@ -47,9 +48,9 @@ public class Client {
     }
 
     public static void main(String[] args ) {
-        String hostname = args[0];
-        int port = Integer.parseInt(args[1]);
-        int rate = Integer.parseInt(args[2]);
+        String hostname = args[1];
+        int port = Integer.parseInt(args[2]);
+        int rate = Integer.parseInt(args[3]);
 
         Client client = new Client();
         SocketChannel serverChannel = client.setupServerConnection(hostname, port);

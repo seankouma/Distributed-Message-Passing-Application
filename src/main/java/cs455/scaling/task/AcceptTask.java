@@ -19,10 +19,17 @@ public class AcceptTask implements Task {
     @Override
     public void executeTask() {
         try {
-            SocketChannel client = serverSocket.accept();
+			SocketChannel client; 
+			synchronized(serverSocket){
+            	client = serverSocket.accept();
+			}
+
             client.configureBlocking(false);
-            selector.wakeup();
-            client.register(selector, SelectionKey.OP_READ);
+
+			synchronized(selector){
+            	selector.wakeup();
+            	client.register(selector, SelectionKey.OP_READ);
+			}
         } catch (ClosedChannelException e) {
             e.printStackTrace();
         } catch (IOException e) {
