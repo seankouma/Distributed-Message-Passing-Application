@@ -7,8 +7,12 @@ import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
+import java.sql.Timestamp;
+import java.util.Timer;
+import java.util.Date;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.security.MessageDigest;
@@ -30,6 +34,7 @@ public class Server {
     private Selector selector;
     private ServerSocketChannel serverSocket;
     private ThreadPool pool;
+    public ConcurrentHashMap<SocketChannel, Integer> messageCount = new ConcurrentHashMap<SocketChannel, Integer>();
 
 	public Server(){
 		taskQueue = new LinkedBlockingQueue<Task>();
@@ -67,12 +72,15 @@ public class Server {
 
     private void listen(int batchSize, int batchTime) {
         try {
+            Timer timer = new Timer();
+            PrintStats ps = new PrintStats(this);
+            timer.scheduleAtFixedRate(ps, 20000L, 20000L);
             LinkedBlockingDeque<BatchUnit> batchQueue = new LinkedBlockingDeque<BatchUnit>();
             while ( true ) {
 				synchronized(selector){
                 	selector.select();
                 	Iterator<SelectionKey> iterator = selector.selectedKeys().iterator();
-                
+                    int received = 0;
                 	while (iterator.hasNext()) {
                     	SelectionKey key = iterator.next();
 						synchronized(key){
@@ -84,18 +92,15 @@ public class Server {
                             client.register(selector, SelectionKey.OP_READ);
                     	}
                     	if (batchQueue.size() >= batchSize) {
-							synchronized(key){
-                            	key.attach(41);
-							}
                         	System.out.println("Batch");
-                        	taskQueue.add(new HashTask(batchQueue));
+                        	taskQueue.add(new HashTask(pool.messageCount, batchQueue, pool.messageTotal));
                         	batchQueue.clear(); 
                     	}
                     	if (key.isReadable()) {
 							synchronized(key){
                             	key.attach(42);
 							}
-                        	System.out.println("Readable. Size: " + batchQueue.size());
+                        	// System.out.println("Readable. Size: " + batchQueue.size());
                         	this.addReadTask(key, batchQueue);
                     	}
                     	iterator.remove();
@@ -121,6 +126,26 @@ public class Server {
 		}
 	}
 		
+    public void printStatistics() {
+        Date date = new Date();
+        long time = date.getTime();
+        Timestamp ts = new Timestamp(time);
+        int size = pool.messageCount.size();
+        if (size == 0) return;
+        synchronized (pool.messageTotal) {
+            double mean = pool.messageTotal.get() / size;
+            double deviationSum = 0;
+            for (Integer sum : pool.messageCount.values()) {
+                double diff = mean - sum;
+                deviationSum += diff * diff;
+            }
+            double dev = Math.sqrt(deviationSum / (size - 1));
+            System.out.format(ts + " Server Throughput: " + pool.messageTotal.get() + ", Active Client Connections: " + size + ", Mean Per-client Throughput: " + mean + ", Std. Dev. Of Per-client Throughput: " + dev + "\n");
+            pool.messageTotal.set(0);
+        }
+        pool.messageCount = new ConcurrentHashMap<SocketChannel, Integer>();
+    }
+    
     private void addAcceptTask(Selector selector, ServerSocketChannel serverSocket) {
         AcceptTask task = new AcceptTask(selector, serverSocket);
 		taskQueue.add(task);	
