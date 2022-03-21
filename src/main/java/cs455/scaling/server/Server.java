@@ -92,7 +92,6 @@ public class Server {
                             client.register(selector, SelectionKey.OP_READ);
                     	}
                     	if (batchQueue.size() >= batchSize) {
-                        	System.out.println("Batch");
                         	taskQueue.add(new HashTask(pool.messageCount, batchQueue, pool.messageTotal));
                         	batchQueue.clear(); 
                     	}
