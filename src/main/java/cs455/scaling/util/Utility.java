@@ -12,7 +12,11 @@ public class Utility {
             digest = MessageDigest.getInstance("SHA1");
             byte[] hash = digest.digest(data);
             BigInteger hashInt = new BigInteger(1, hash);
-            return hashInt.toString(16);
+            String strHash = hashInt.toString(16);
+            while (strHash.length() != 40) {
+                strHash = "0" + strHash;
+            }
+            return strHash;
         } catch (NoSuchAlgorithmException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
