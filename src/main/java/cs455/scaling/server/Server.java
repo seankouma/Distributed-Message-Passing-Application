@@ -79,7 +79,7 @@ public class Server {
           Timer timer = new Timer();
           PrintStats ps = new PrintStats(this);
           timer.scheduleAtFixedRate(ps, 20000L, 20000L);
-          LinkedBlockingDeque<BatchUnit> batchQueue = new LinkedBlockingDeque<BatchUnit>();
+        //   LinkedBlockingDeque<BatchUnit> batchQueue = new LinkedBlockingDeque<BatchUnit>();
           while ( true ) {
 				synchronized(selector){
                 	selector.select();
