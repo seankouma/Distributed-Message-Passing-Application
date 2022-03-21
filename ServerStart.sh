@@ -1,3 +1,8 @@
 #! /bin/bash
 
-java -jar build/libs/cs455-hw2.jar cs455.scaling.main.Main Server $1 $2 $3 $4
+port=$1
+poolSize=$2
+batchSize=$3
+batchTime=$4
+
+java -jar build/libs/cs455-hw2.jar cs455.scaling.main.Main Server $port $poolSize $batchSize $batchTime

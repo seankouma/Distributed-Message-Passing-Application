@@ -75,6 +75,16 @@ public class Server {
                 
                 	while (iterator.hasNext()) {
                     	SelectionKey key = iterator.next();
+
+						if(key.attachment() != null){
+							continue;
+						}
+						else{
+							synchronized(key){
+								key.attach(42);
+							}
+						}
+
                     	if (key.isAcceptable()) {
                         	System.out.println("Acceptable");
                         	this.addAcceptTask(this.selector, this.serverSocket);
