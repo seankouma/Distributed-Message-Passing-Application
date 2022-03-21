@@ -35,8 +35,11 @@ public class Server {
     private ServerSocketChannel serverSocket;
     private ThreadPool pool;
     public ConcurrentHashMap<SocketChannel, Integer> messageCount = new ConcurrentHashMap<SocketChannel, Integer>();
-
+	  private long timeSinceLastBatch;
+	  private LinkedBlockingDeque<BatchUnit> batchQueue;
 	public Server(){
+
+        batchQueue = new LinkedBlockingDeque<BatchUnit>();
 		taskQueue = new LinkedBlockingQueue<Task>();
 	}
 
@@ -71,12 +74,13 @@ public class Server {
     }
 
     private void listen(int batchSize, int batchTime) {
+		timeSinceLastBatch = System.nanoTime();
         try {
-            Timer timer = new Timer();
-            PrintStats ps = new PrintStats(this);
-            timer.scheduleAtFixedRate(ps, 20000L, 20000L);
-            LinkedBlockingDeque<BatchUnit> batchQueue = new LinkedBlockingDeque<BatchUnit>();
-            while ( true ) {
+          Timer timer = new Timer();
+          PrintStats ps = new PrintStats(this);
+          timer.scheduleAtFixedRate(ps, 20000L, 20000L);
+          LinkedBlockingDeque<BatchUnit> batchQueue = new LinkedBlockingDeque<BatchUnit>();
+          while ( true ) {
 				synchronized(selector){
                 	selector.select();
                 	Iterator<SelectionKey> iterator = selector.selectedKeys().iterator();
@@ -91,9 +95,8 @@ public class Server {
                             client.configureBlocking(false);
                             client.register(selector, SelectionKey.OP_READ);
                     	}
-                    	if (batchQueue.size() >= batchSize) {
-                        	taskQueue.add(new HashTask(pool.messageCount, batchQueue, pool.messageTotal));
-                        	batchQueue.clear(); 
+                    	if (shouldSendBatch(batchSize, batchTime)){
+							sendBatch();
                     	}
                     	if (key.isReadable()) {
 							synchronized(key){
@@ -116,6 +119,16 @@ public class Server {
             e.printStackTrace();
         }
     }
+
+	private boolean shouldSendBatch(int batchSize, int batchTime){
+		return batchQueue.size() >= batchSize || System.nanoTime() - timeSinceLastBatch > Math.pow(10, 9) * batchTime;
+	}
+
+	private void sendBatch(){
+		taskQueue.add(new HashTask(pool.messageCount, batchQueue, pool.messageTotal));
+		batchQueue.clear(); 
+		timeSinceLastBatch = System.nanoTime();
+	}
 
 	private void assignTasks(){
 		synchronized(pool){

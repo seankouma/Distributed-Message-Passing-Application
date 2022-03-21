@@ -7,10 +7,18 @@ import java.nio.channels.SocketChannel;
 import java.util.Random;
 import java.util.Timer;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.Date;
+import java.sql.Timestamp;
 
 public class Client {
 
     private ConcurrentHashMap<String,byte[]> hashesToArrays = new ConcurrentHashMap<String, byte[]>();
+	private int sent, recieved;
+
+	public Client(){
+		sent = 0;
+		recieved = 0;
+	}
     
     public void sendPackets(SocketChannel channel, long period) {
         Random r = new Random();
@@ -56,4 +64,21 @@ public class Client {
         SocketChannel serverChannel = client.setupServerConnection(hostname, port);
         client.sendPackets(serverChannel, 1000L / rate);
     }
+
+	public synchronized void printStatitics(){
+		Date date = new Date();
+		long time = date.getTime();
+		Timestamp ts = new Timestamp(time);
+		System.out.println(ts + "Total Sent Count: " + sent + ", Total Recieved Count: " + recieved);
+		sent = 0;
+		recieved = 0;
+	}
+
+	public synchronized void incrementSent(){
+		sent++;
+	}
+
+	public synchronized void incrementRecieved(){
+		recieved++;
+	}
 }
