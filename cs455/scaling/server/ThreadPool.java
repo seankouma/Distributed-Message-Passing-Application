@@ -1,7 +1,6 @@
 package cs455.scaling.server;
 // Some code taken from http://tutorials.jenkov.com/java-concurrency/thread-pools.html
 
-import java.nio.channels.SocketChannel;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -9,7 +8,6 @@ import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import cs455.scaling.task.Task;
 
@@ -17,15 +15,13 @@ public class ThreadPool {
 
     private LinkedBlockingQueue<Task> taskQueue = null;
     private List<PoolThreadRunnable> runnables = new ArrayList<>();
-    private LinkedBlockingQueue<PoolThreadRunnable> available = new LinkedBlockingQueue<PoolThreadRunnable>();
-    public  ConcurrentHashMap<SocketChannel, Integer> messageCount = new ConcurrentHashMap<SocketChannel, Integer>();
-    public AtomicInteger messageTotal = new AtomicInteger(0);
+    private Deque<PoolThreadRunnable> available = new ArrayDeque<PoolThreadRunnable>();
 
     public ThreadPool(int noOfThreads){
         taskQueue = new LinkedBlockingQueue<Task>();
 
         for(int i=0; i<noOfThreads; i++){
-            PoolThreadRunnable ptr = new PoolThreadRunnable(available, this);
+            PoolThreadRunnable ptr = new PoolThreadRunnable(taskQueue, this);
             runnables.add(ptr);
             available.add(ptr);
         }
@@ -34,10 +30,11 @@ public class ThreadPool {
         }
     }
 
-    public void execute(Task task) {
-        PoolThreadRunnable current =  available.poll();
-        while (current == null) current = available.poll();
-        current.setTask(task);
+    public synchronized void execute(Task task) {
+        PoolThreadRunnable current =  available.pollLast();
+        while (current == null) current = available.pollLast();
+        current.addTask(task);
+        available.addFirst(current);
     }
 
     public synchronized void waitUntilAllTasksFinished() {
@@ -49,4 +46,5 @@ public class ThreadPool {
             }
         }
     }
+
 }
