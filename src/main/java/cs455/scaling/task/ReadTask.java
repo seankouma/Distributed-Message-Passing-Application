@@ -28,6 +28,9 @@ public class ReadTask implements Task {
 			synchronized(batchQueue){
             	batchQueue.offer(new BatchUnit(buffer.array(), client));
 			}
+            synchronized (key) {
+                this.key.attach(null);
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }

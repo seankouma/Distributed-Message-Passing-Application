@@ -30,8 +30,11 @@ public class Server {
     private Selector selector;
     private ServerSocketChannel serverSocket;
     private ThreadPool pool;
-
+	private long timeSinceLastBatch;
+	private LinkedBlockingDeque<BatchUnit> batchQueue;
 	public Server(){
+
+        batchQueue = new LinkedBlockingDeque<BatchUnit>();
 		taskQueue = new LinkedBlockingQueue<Task>();
 	}
 
@@ -66,8 +69,8 @@ public class Server {
     }
 
     private void listen(int batchSize, int batchTime) {
+		timeSinceLastBatch = System.nanoTime();
         try {
-            LinkedBlockingDeque<BatchUnit> batchQueue = new LinkedBlockingDeque<BatchUnit>();
             while ( true ) {
 				synchronized(selector){
                 	selector.select();
@@ -75,16 +78,22 @@ public class Server {
                 
                 	while (iterator.hasNext()) {
                     	SelectionKey key = iterator.next();
+						synchronized(key){
+                        	if (key.attachment() != null) continue;
+						}
                     	if (key.isAcceptable()) {
-                        	System.out.println("Acceptable");
-                        	this.addAcceptTask(this.selector, this.serverSocket);
+                        	SocketChannel client = serverSocket.accept();
+                            client.configureBlocking(false);
+                            client.register(selector, SelectionKey.OP_READ);
                     	}
-                    	if (batchQueue.size() >= batchSize) {
+                    	if (shouldSendBatch(batchSize, batchTime)){
+							sendBatch();
                         	System.out.println("Batch");
-                        	taskQueue.add(new HashTask(batchQueue));
-                        	batchQueue.clear(); 
                     	}
                     	if (key.isReadable()) {
+							synchronized(key){
+                            	key.attach(42);
+							}
                         	System.out.println("Readable. Size: " + batchQueue.size());
                         	this.addReadTask(key, batchQueue);
                     	}
@@ -102,6 +111,16 @@ public class Server {
             e.printStackTrace();
         }
     }
+
+	private boolean shouldSendBatch(int batchSize, int batchTime){
+		return batchQueue.size() >= batchSize || System.nanoTime() - timeSinceLastBatch > Math.pow(10, 9) * batchTime;
+	}
+
+	private void sendBatch(){
+		taskQueue.add(new HashTask(batchQueue));
+		batchQueue.clear(); 
+		timeSinceLastBatch = System.nanoTime();
+	}
 
 	private void assignTasks(){
 		synchronized(pool){
