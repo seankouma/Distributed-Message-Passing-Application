@@ -19,15 +19,27 @@ public class AcceptTask implements Task {
     @Override
     public void executeTask() {
         try {
+<<<<<<< Updated upstream:cs455/scaling/task/AcceptTask.java
             SocketChannel client = serverSocket.accept();
-            client.configureBlocking(false);
+            // client.configureBlocking(false);
             selector.wakeup();
             client.register(selector, SelectionKey.OP_READ);
+=======
+			SocketChannel client; 
+			synchronized(serverSocket){
+            	client = serverSocket.accept();
+                client.configureBlocking(false);
+			}
+
+			synchronized(selector){
+            	selector.wakeup();
+            	client.register(selector, SelectionKey.OP_READ);
+			}
+>>>>>>> Stashed changes:src/main/java/cs455/scaling/task/AcceptTask.java
         } catch (ClosedChannelException e) {
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
         }
-        System.out.println("It works!");
     }
 }

@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
@@ -13,10 +14,14 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.sql.Timestamp;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.Random;
+import java.util.Timer;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import cs455.scaling.task.AcceptTask;
 import cs455.scaling.task.HashTask;
@@ -27,6 +32,7 @@ public class Server {
     private Selector selector;
     private ServerSocketChannel serverSocket;
     private ThreadPool pool;
+    public  ConcurrentHashMap<SocketChannel, Integer> messageCount = new ConcurrentHashMap<SocketChannel, Integer>();
 
     private void setupServerSocketChannel(String host, int port) {
         try {
@@ -60,7 +66,11 @@ public class Server {
 
     private void listen(int batchSize, int batchTime) {
         try {
+            Timer timer = new Timer();
+            PrintStats ps = new PrintStats(this);
+            timer.scheduleAtFixedRate(ps, 20000L, 20000L);
             LinkedBlockingDeque<BatchUnit> batchQueue = new LinkedBlockingDeque<BatchUnit>();
+            int received = 0;
             while ( true ) {
                 selector.select();
                 Iterator<SelectionKey> iterator = selector.selectedKeys().iterator();
@@ -68,16 +78,21 @@ public class Server {
                 while (iterator.hasNext()) {
                     SelectionKey key = iterator.next();
                     if (key.isAcceptable()) {
-                        System.out.println("Acceptable");
-                        this.addAcceptTask(this.selector, this.serverSocket);
+                        // System.out.println("Acceptable");
+                        // System.out.flush();
+                        // this.addAcceptTask(this.selector, this.serverSocket);
+                        SocketChannel client = serverSocket.accept();
+                        client.configureBlocking(false);
+                        client.register(selector, SelectionKey.OP_READ);
+                    
                     }
                     if (batchQueue.size() >= batchSize) {
-                        System.out.println("Batch");
-                        this.pool.execute(new HashTask(batchQueue));
-                        batchQueue = new LinkedBlockingDeque<BatchUnit>();
+                        this.pool.execute(new HashTask(pool.messageCount,batchQueue, pool.messageTotal));
+                        // batchQueue = new LinkedBlockingDeque<BatchUnit>();
                     }
                     if (key.isReadable()) {
-                        System.out.println("Readable. Size: " + batchQueue.size());
+                        // System.out.println("Readable. Size: " + batchQueue.size());
+                        // System.out.flush();
                         this.addReadTask(key, batchQueue);
                     }
                     iterator.remove();
@@ -93,6 +108,24 @@ public class Server {
         }
     }
 
+    public void printStatistics() {
+        Date date = new Date();
+        long time = date.getTime();
+        Timestamp ts = new Timestamp(time);
+        int size = pool.messageCount.size();
+        if (size == 0) return;
+        double mean = pool.messageTotal.get() / size;
+        double deviationSum = 0;
+        for (Integer sum : pool.messageCount.values()) {
+            double diff = mean - sum;
+            deviationSum += diff * diff;
+        }
+        double dev = Math.sqrt(deviationSum / (size - 1));
+        System.out.format(ts + " Server Throughput: " + pool.messageTotal.get() + ", Active Client Connections: " + size + ", Mean Per-client Throughput: " + mean + ", Std. Dev. Of Per-client Throughput: " + dev + "\n");
+        pool.messageTotal.set(0);
+        pool.messageCount = new ConcurrentHashMap<SocketChannel, Integer>();
+    }
+    
     private void addAcceptTask(Selector selector, ServerSocketChannel serverSocket) {
         AcceptTask task = new AcceptTask(selector, serverSocket);
         this.pool.execute(task);
