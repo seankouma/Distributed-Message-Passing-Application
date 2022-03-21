@@ -75,16 +75,20 @@ public class Server {
                 
                 	while (iterator.hasNext()) {
                     	SelectionKey key = iterator.next();
+                        if (key.attachment() != null) continue;
                     	if (key.isAcceptable()) {
-                        	System.out.println("Acceptable");
-                        	this.addAcceptTask(this.selector, this.serverSocket);
+                        	SocketChannel client = serverSocket.accept();
+                            client.configureBlocking(false);
+                            client.register(selector, SelectionKey.OP_READ);
                     	}
                     	if (batchQueue.size() >= batchSize) {
+                            key.attach(41);
                         	System.out.println("Batch");
                         	taskQueue.add(new HashTask(batchQueue));
                         	batchQueue.clear(); 
                     	}
                     	if (key.isReadable()) {
+                            key.attach(42);
                         	System.out.println("Readable. Size: " + batchQueue.size());
                         	this.addReadTask(key, batchQueue);
                     	}
