@@ -35,6 +35,7 @@ public class SendTask extends TimerTask {
             this.hashesToArrays.put(hash, b);
         } catch (IOException e) {
             e.printStackTrace();
+            System.exit(0); // If we lose connection to the server, shutdown
         }
     }
 }

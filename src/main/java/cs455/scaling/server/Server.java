@@ -149,7 +149,7 @@ public class Server implements Node {
         int size = pool.messageCount.size();
         if (size == 0) return;
         synchronized (pool.messageTotal) {
-            double mean = pool.messageTotal.get() / size;
+            double mean = (float) pool.messageTotal.get() / size;
             double deviationSum = 0;
             for (Integer sum : pool.messageCount.values()) {
                 double diff = mean - sum;

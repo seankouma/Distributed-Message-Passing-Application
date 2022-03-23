@@ -30,7 +30,7 @@ public class Client implements Node {
 
         SendTask task = new SendTask(channel, hashesToArrays, this);
 
-        timer.scheduleAtFixedRate(task, 0L, period);
+        timer.scheduleAtFixedRate(task, 100L, period);
         PrintStats ps = new PrintStats(this);
         timer.scheduleAtFixedRate(ps, 10000L, 10000L);
 
@@ -49,7 +49,7 @@ public class Client implements Node {
                 e.printStackTrace();
             }
 			if(shouldDie(startTime)){
-				System.exit(0);
+				System.exit(0); // This is only for demo purposes so we don't leave 100 processes running
 			}
         }
     }
@@ -81,7 +81,7 @@ public class Client implements Node {
 		Date date = new Date();
 		long time = date.getTime();
 		Timestamp ts = new Timestamp(time);
-		System.out.println(ts + "Total Sent Count: " + sent + ", Total Recieved Count: " + recieved);
+		System.out.println(ts + " Total Sent Count: " + sent + ", Total Received Count: " + recieved);
 		sent = 0;
 		recieved = 0;
 	}
