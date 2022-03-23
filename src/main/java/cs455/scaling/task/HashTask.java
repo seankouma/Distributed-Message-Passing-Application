@@ -36,7 +36,7 @@ public class HashTask implements Task {
                 unit.channel.write(ByteBuffer.wrap(hash.getBytes()));
                 if (countProcessed.keySet().contains(unit.channel)) {
                     countProcessed.put(unit.channel, countProcessed.get(unit.channel) + 1);
-                    total.incrementAndGet();
+                    // total.incrementAndGet();
                 } else {
                     countProcessed.put(unit.channel, 1);
                 }

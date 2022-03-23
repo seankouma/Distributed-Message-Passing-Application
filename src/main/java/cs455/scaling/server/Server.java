@@ -168,7 +168,7 @@ public class Server implements Node {
     }
 
     private void addReadTask(SelectionKey key, LinkedBlockingDeque<BatchUnit> batchQueue, int maxSize) throws Exception {
-        ReadTask task = new ReadTask(key, batchQueue, maxSize);
+        ReadTask task = new ReadTask(key, batchQueue, maxSize, pool.messageTotal);
 		taskQueue.add(task);	
     }
 }

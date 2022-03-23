@@ -30,9 +30,9 @@ public class Client implements Node {
 
         SendTask task = new SendTask(channel, hashesToArrays, this);
 
-        timer.scheduleAtFixedRate(task, 100L, period);
+        timer.scheduleAtFixedRate(task, 300L, period);
         PrintStats ps = new PrintStats(this);
-        timer.scheduleAtFixedRate(ps, 10000L, 10000L);
+        timer.scheduleAtFixedRate(ps, 20000L, 20000L);
 
         ByteBuffer buffer = ByteBuffer.allocate(40);
         int bytesRead = 0;
