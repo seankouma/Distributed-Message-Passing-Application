@@ -7,9 +7,9 @@ To setup this project, clone this repo, then run gradle build.
 
 ### Run Programs
 ##### Server
-To run the server, run ServerStart.sh <port number> <thread pool size> <batch size> <batch time>. Port number is the port the server will run on. Thread pool size is the number of threads that will be responsible for processing connections. Batch size and batch time are both related to when responses will be sent to the clients. If either the number of messages recieved exceeds batch size or the time since the last send exceeds batch time, responses are sent to the clients. This structure is designed to minimize thread context switching, thereby increasing efficiency.
+To run the server, run ServerStart.sh port-number thread-pool-size batch-size batch-time. Port number is the port the server will run on. Thread pool size is the number of threads that will be responsible for processing connections. Batch size and batch time are both related to when responses will be sent to the clients. If either the number of messages recieved exceeds batch size or the time since the last send exceeds batch time, responses are sent to the clients. This structure is designed to minimize thread context switching, thereby increasing efficiency.
 ##### Client
-  To run the clients, run ClientStart.sh <hosname of server> <port of server> <messages to send per second>
+  To run the clients, run ClientStart.sh hosname-of-server port-of-server messages-to-send-per-second
   ### Directories
   ##### Server
   This contains the code for our server as well as our thread pool and the code that each thread in the thread pool will execute.
