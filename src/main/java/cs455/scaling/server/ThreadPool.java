@@ -7,12 +7,16 @@ import java.util.Deque;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.nio.channels.SocketChannel;
 
 import cs455.scaling.task.Task;
 
 public class ThreadPool {
 
     private Deque<PoolThreadRunnable> available = new ArrayDeque<PoolThreadRunnable>();
+    public  ConcurrentHashMap<SocketChannel, Integer> messageCount = new ConcurrentHashMap<SocketChannel, Integer>();
+    public AtomicInteger messageTotal = new AtomicInteger(0);
 
     public ThreadPool(int noOfThreads){
 

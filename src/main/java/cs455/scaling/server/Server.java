@@ -7,8 +7,12 @@ import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
+import java.sql.Timestamp;
+import java.util.Timer;
+import java.util.Date;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.security.MessageDigest;
@@ -24,14 +28,16 @@ import cs455.scaling.task.AcceptTask;
 import cs455.scaling.task.HashTask;
 import cs455.scaling.task.ReadTask;
 import cs455.scaling.util.Utility;
+import cs455.scaling.util.Node;
 
-public class Server {
+public class Server implements Node {
     private LinkedBlockingQueue<Task> taskQueue;
     private Selector selector;
     private ServerSocketChannel serverSocket;
     private ThreadPool pool;
-	private long timeSinceLastBatch;
-	private LinkedBlockingDeque<BatchUnit> batchQueue;
+    public ConcurrentHashMap<SocketChannel, Integer> messageCount = new ConcurrentHashMap<SocketChannel, Integer>();
+	  private long timeSinceLastBatch;
+	  private LinkedBlockingDeque<BatchUnit> batchQueue;
 	public Server(){
 
         batchQueue = new LinkedBlockingDeque<BatchUnit>();
@@ -71,11 +77,15 @@ public class Server {
     private void listen(int batchSize, int batchTime) {
 		timeSinceLastBatch = System.nanoTime();
         try {
-            while ( true ) {
+          Timer timer = new Timer();
+          PrintStats ps = new PrintStats(this);
+          timer.scheduleAtFixedRate(ps, 20000L, 20000L);
+        //   LinkedBlockingDeque<BatchUnit> batchQueue = new LinkedBlockingDeque<BatchUnit>();
+          while ( true ) {
 				synchronized(selector){
                 	selector.select();
                 	Iterator<SelectionKey> iterator = selector.selectedKeys().iterator();
-                
+                    int received = 0;
                 	while (iterator.hasNext()) {
                     	SelectionKey key = iterator.next();
 						synchronized(key){
@@ -86,16 +96,18 @@ public class Server {
                             client.configureBlocking(false);
                             client.register(selector, SelectionKey.OP_READ);
                     	}
-                    	if (shouldSendBatch(batchSize, batchTime)){
-							sendBatch();
-                        	System.out.println("Batch");
-                    	}
+						synchronized(batchQueue){
+                    		if (shouldSendBatch(batchSize, batchTime)){
+								sendBatch();
+								batchQueue.notifyAll();
+                    		}
+						}
                     	if (key.isReadable()) {
 							synchronized(key){
                             	key.attach(42);
 							}
-                        	System.out.println("Readable. Size: " + batchQueue.size());
-                        	this.addReadTask(key, batchQueue);
+                        	// System.out.println("Readable. Size: " + batchQueue.size());
+                        	this.addReadTask(key, batchQueue, batchSize);
                     	}
                     	iterator.remove();
                 	}
@@ -117,7 +129,7 @@ public class Server {
 	}
 
 	private void sendBatch(){
-		taskQueue.add(new HashTask(batchQueue));
+		taskQueue.add(new HashTask(pool.messageCount, batchQueue, pool.messageTotal));
 		batchQueue.clear(); 
 		timeSinceLastBatch = System.nanoTime();
 	}
@@ -130,13 +142,33 @@ public class Server {
 		}
 	}
 		
+    public void printStatistics() {
+        Date date = new Date();
+        long time = date.getTime();
+        Timestamp ts = new Timestamp(time);
+        int size = pool.messageCount.size();
+        if (size == 0) return;
+        synchronized (pool.messageTotal) {
+            double mean = (float) pool.messageTotal.get() / size;
+            double deviationSum = 0;
+            for (Integer sum : pool.messageCount.values()) {
+                double diff = mean - sum;
+                deviationSum += diff * diff;
+            }
+            double dev = Math.sqrt(deviationSum / (size - 1));
+            System.out.format(ts + " Server Throughput: " + pool.messageTotal.get() + ", Active Client Connections: " + size + ", Mean Per-client Throughput: " + mean + ", Std. Dev. Of Per-client Throughput: " + dev + "\n");
+            pool.messageTotal.set(0);
+        }
+        pool.messageCount = new ConcurrentHashMap<SocketChannel, Integer>();
+    }
+    
     private void addAcceptTask(Selector selector, ServerSocketChannel serverSocket) {
         AcceptTask task = new AcceptTask(selector, serverSocket);
 		taskQueue.add(task);	
     }
 
-    private void addReadTask(SelectionKey key, LinkedBlockingDeque<BatchUnit> batchQueue) throws Exception {
-        ReadTask task = new ReadTask(key, batchQueue);
+    private void addReadTask(SelectionKey key, LinkedBlockingDeque<BatchUnit> batchQueue, int maxSize) throws Exception {
+        ReadTask task = new ReadTask(key, batchQueue, maxSize, pool.messageTotal);
 		taskQueue.add(task);	
     }
 }
