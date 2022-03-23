@@ -21,6 +21,7 @@ public class Client {
 	}
     
     public void sendPackets(SocketChannel channel, long period) {
+		long startTime = System.nanoTime();
         Random r = new Random();
 
         Timer timer = new Timer();
@@ -38,8 +39,13 @@ public class Client {
                 e.printStackTrace();
             }
             String hash = new String(buffer.array()).trim();
+			System.out.println(hash);
+			System.exit(0);
             this.hashesToArrays.remove(hash);
             buffer.rewind();
+			if(shouldDie(startTime)){
+				System.exit(0);
+			}
         }
     }
 
@@ -80,5 +86,9 @@ public class Client {
 
 	public synchronized void incrementRecieved(){
 		recieved++;
+	}
+
+	private boolean shouldDie(long startTime){
+		return System.nanoTime() - startTime > 5 * 60 * Math.pow(10, 9);
 	}
 }

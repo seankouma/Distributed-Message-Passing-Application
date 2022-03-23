@@ -95,15 +95,18 @@ public class Server {
                             client.configureBlocking(false);
                             client.register(selector, SelectionKey.OP_READ);
                     	}
-                    	if (shouldSendBatch(batchSize, batchTime)){
-							sendBatch();
-                    	}
+						synchronized(batchQueue){
+                    		if (shouldSendBatch(batchSize, batchTime)){
+								sendBatch();
+								batchQueue.notifyAll();
+                    		}
+						}
                     	if (key.isReadable()) {
 							synchronized(key){
                             	key.attach(42);
 							}
                         	// System.out.println("Readable. Size: " + batchQueue.size());
-                        	this.addReadTask(key, batchQueue);
+                        	this.addReadTask(key, batchQueue, batchSize);
                     	}
                     	iterator.remove();
                 	}
@@ -163,8 +166,8 @@ public class Server {
 		taskQueue.add(task);	
     }
 
-    private void addReadTask(SelectionKey key, LinkedBlockingDeque<BatchUnit> batchQueue) throws Exception {
-        ReadTask task = new ReadTask(key, batchQueue);
+    private void addReadTask(SelectionKey key, LinkedBlockingDeque<BatchUnit> batchQueue, int maxSize) throws Exception {
+        ReadTask task = new ReadTask(key, batchQueue, maxSize);
 		taskQueue.add(task);	
     }
 }
