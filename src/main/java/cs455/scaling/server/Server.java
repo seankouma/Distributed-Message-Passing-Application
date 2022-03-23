@@ -28,8 +28,9 @@ import cs455.scaling.task.AcceptTask;
 import cs455.scaling.task.HashTask;
 import cs455.scaling.task.ReadTask;
 import cs455.scaling.util.Utility;
+import cs455.scaling.util.Node;
 
-public class Server {
+public class Server implements Node {
     private LinkedBlockingQueue<Task> taskQueue;
     private Selector selector;
     private ServerSocketChannel serverSocket;

@@ -1,11 +1,12 @@
 package cs455.scaling.server;
+import cs455.scaling.util.*;
 
 import java.util.TimerTask;
 
 public class PrintStats extends TimerTask {
-    Server server;
+    Node server;
 
-    PrintStats(Server server) {
+    public PrintStats(Node server) {
         this.server = server;
     }
     @Override
