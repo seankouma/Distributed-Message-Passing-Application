@@ -10,10 +10,12 @@ import cs455.scaling.server.BatchUnit;
 public class ReadTask implements Task {
     SelectionKey key;
     LinkedBlockingDeque<BatchUnit> batchQueue;
+	private int maxSize;
 
-    public ReadTask(SelectionKey key, LinkedBlockingDeque<BatchUnit> batchQueue) {
+    public ReadTask(SelectionKey key, LinkedBlockingDeque<BatchUnit> batchQueue, int maxSize) {
         this.key = key;
         this.batchQueue = batchQueue;
+		this.maxSize = maxSize;
     }
     
     @Override
@@ -26,6 +28,9 @@ public class ReadTask implements Task {
                 bytesRead = client.read( buffer );
             }
 			synchronized(batchQueue){
+				if(batchQueue.size() >= maxSize){
+					batchQueue.wait();
+				}
             	batchQueue.offer(new BatchUnit(buffer.array(), client));
 			}
             synchronized (key) {

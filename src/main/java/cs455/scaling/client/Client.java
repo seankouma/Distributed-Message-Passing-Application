@@ -23,6 +23,7 @@ public class Client implements Node {
 	}
     
     public void sendPackets(SocketChannel channel, long period) {
+		long startTime = System.nanoTime();
         Random r = new Random();
 
         Timer timer = new Timer();
@@ -47,8 +48,9 @@ public class Client implements Node {
             } catch (IOException e) {
                 e.printStackTrace();
             }
-            // if (hash.length() > 0) System.out.println((int) hash.charAt(0));
-            
+			if(shouldDie(startTime)){
+				System.exit(0);
+			}
         }
     }
 
@@ -90,5 +92,9 @@ public class Client implements Node {
 
 	public synchronized void incrementRecieved(){
 		recieved++;
+	}
+
+	private boolean shouldDie(long startTime){
+		return System.nanoTime() - startTime > 5 * 60 * Math.pow(10, 9);
 	}
 }
