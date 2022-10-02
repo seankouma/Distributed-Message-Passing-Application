@@ -1,4 +1,4 @@
-# CS455 HW2
+# Distributed Message Passing Application
 
 cs455.scaling is a package designed to create a multithreaded server as well as several clients and have the clients write to the server. Statistics about message passing will be printed by the server and all the clients. 
 
